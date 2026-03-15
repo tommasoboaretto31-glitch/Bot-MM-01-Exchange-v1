@@ -276,6 +276,16 @@ class BacktestHeatmap:
         if last["close"] > 0:
             spread_bps = (last["high"] - last["low"]) / last["close"] * 10000 * 0.1
 
+        return LiquidityBias(
+            score=score,
+            raw_score=raw_score,
+            liquidity_above=liq_above,
+            liquidity_below=liq_below,
+            total_liquidity=total,
+            spread_bps=spread_bps,
+            is_anomalous=False,
+        )
+
     def compute_direct(
         self,
         liq_above: float,

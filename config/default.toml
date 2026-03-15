@@ -3,28 +3,11 @@ capital = 100.0                    # [USD] Starting capital for sizing calculati
 timeframe = "1m"                  # Candle timeframe: 1m (faster), 3m, 5m (more stable)
 paper_mode = true                 # SET TO FALSE FOR REAL TRADING
 
-[markets]
-# Symbols to trade. High volume 추천: HYPEUSD, SUIUSD, BERAUSD
-symbols = ["AAVEUSD", "APTUSD", "BERAUSD", "HYPEUSD", "SUIUSD"]
-excluded = []                     # Automatically populated based on performance
-
-[market_maker]
-# --- STRATEGY PRESETS ---
-# SAFE: spread_bps=15, fixed_tp_bps=5
-# STANDARD: spread_bps=8, fixed_tp_bps=2
-# FARMING: spread_bps=5, fixed_tp_bps=1
-
-spread_bps = 8                   # Distance from mid-price to place orders
-order_size_pct = 10.0             # % of capital per order (recomm: 5-15%)
-max_inventory_pct = 45.0          # Max bias toward one side (long/short)
-stale_candles = 20                # Max age of a position in candles before closing
-use_atr_spread = true             # Adjust spread based on volatility
-atr_spread_mult = 0.5            # Multiplier for ATR-based spread
 min_spread_bps = 5                # Never go below this spread
-fixed_tp_bps = 2                    # Profit target per trade
+fixed_tp_bps = 3                    # Profit target per trade
 inventory_skew_factor = 0.5       # How aggressively to reduce position bias
 stop_loss_bps = 35                # Hard stop distance
-volatiltiy_pause_mult = 1.5       # Halt trading if volatility > 1.5x average
+volatility_pause_mult = 1.5       # Halt trading if volatility > 1.5x average
 
 [grid]
 levels = 8                        # Number of orders on each side

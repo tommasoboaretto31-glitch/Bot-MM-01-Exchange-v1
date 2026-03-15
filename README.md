@@ -101,9 +101,8 @@ All settings live in **`config/default.toml`**:
 
 | Preset | `spread_bps` | `fixed_tp_bps` | Best For |
 | :--- | :---: | :---: | :--- |
-| 🛡️ **Safe** | `15` | `5` | Capital preservation |
-| ⚖️ **Standard** | `8` | `2` | Default BE strategy |
-| 🚀 **Farming** | `5` | `1` | Maximum volume & rebates |
+| 🛡️ **Safe Growth** | `15` | `5` | Capital growth & steady profit |
+| 🚀 **Standard Farming** | `8` | `3` | Maximum volume & rebates |
 
 ### Key Parameters
 
@@ -114,7 +113,7 @@ paper_mode = true         # Set to false for real trading
 
 [market_maker]
 spread_bps = 8            # Distance from mid-price (basis points)
-fixed_tp_bps = 2          # Take-profit target per trade
+fixed_tp_bps = 3          # Take-profit target per trade
 order_size_pct = 10.0     # % of capital per order
 stop_loss_bps = 35        # Hard stop distance
 

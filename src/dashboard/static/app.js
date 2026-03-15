@@ -105,7 +105,8 @@ function updatePerformance(perf) {
 
     document.getElementById('stat-initial').textContent = `Initial: $${initial.toFixed(2)}`;
 
-    document.getElementById('stat-pnl').textContent = `${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}`;
+    const pnlSign = pnl >= 0 ? '+' : '-';
+    document.getElementById('stat-pnl').textContent = `${pnlSign}$${Math.abs(pnl).toFixed(2)}`;
     document.getElementById('stat-pnl').className =
         `stat-value ${pnl >= 0 ? 'positive' : 'negative'}`;
 
@@ -153,7 +154,7 @@ function updatePositions(positions) {
                 <td>$${(p.entry || 0).toFixed(4)}</td>
                 <td>$${(p.mark || 0).toFixed(4)}</td>
                 <td class="stat-value ${pnlClass}" style="font-size: 12px;">
-                    ${(p.pnl || 0) >= 0 ? '+' : ''}$${(p.pnl || 0).toFixed(2)}
+                    ${(p.pnl || 0) >= 0 ? '+$' : '-$'}${Math.abs(p.pnl || 0).toFixed(2)}
                 </td>
             </tr>`;
     }).join('');
@@ -208,7 +209,7 @@ function updateVolumes(volumes) {
                 </div>
                 <div class="volume-market-values">
                     <span class="volume-market-vol">${formatUSD(vol)}</span>
-                    <span class="volume-market-pnl ${pnlClass}">${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}</span>
+                    <span class="volume-market-pnl ${pnlClass}">${pnl >= 0 ? '+$' : '-$'}${Math.abs(pnl).toFixed(2)}</span>
                 </div>
             </div>`;
     }).join('');

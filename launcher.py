@@ -327,7 +327,8 @@ class UltraStableLauncher(ctk.CTk):
             
             self.start_cap_val.configure(text=f"${initial_cap:.2f}")
             self.cap_val.configure(text=f"${_performance['capital']:.2f}")
-            self.pnl_val.configure(text=f"${pnl_usd:+.2f} ({pnl_pct:+.2f}%)")
+            sign = "+" if pnl_usd >= 0 else "-"
+            self.pnl_val.configure(text=f"{sign}${abs(pnl_usd):.2f} ({sign}{abs(pnl_pct):.2f}%)")
             self.vol_val.configure(text=f"${_volume_data['total']:.2f}")
             
             if pnl_usd > 0: self.pnl_val.configure(text_color="#00FF66")

@@ -281,7 +281,10 @@ class LiveTrader:
             
             price = float(trade["price"])
             last_price = price
-            size = float(trade.get("baseSize", trade.get("size", 0)))
+            size_raw = trade.get("baseSize", trade.get("size", 0))
+            if size_raw is None:
+                size_raw = 0.0
+            size = float(size_raw)
             
             completed_candle = self.aggregators[symbol].update(price, size, dt)
             if completed_candle:
@@ -486,7 +489,7 @@ class LiveTrader:
                 # Cancel concurrently
                 res = await asyncio.gather(*cancels, return_exceptions=True)
                 for r in res:
-                    if isinstance(r, Exception):
+                    if isinstance(r, BaseException):
                         logger.debug(f"[{symbol}] Cancel error: {r}")
 
             mid = self.market_ids[symbol]
@@ -503,7 +506,7 @@ class LiveTrader:
                 if needs_buy_requote and state.buy_size > 0:
                     r = results[idx]
                     idx += 1
-                    if isinstance(r, Exception):
+                    if isinstance(r, BaseException):
                         if "POST_ONLY" not in str(r) and "RISK" not in str(r):
                             logger.error(f"[{symbol}] Real BUY failed: {r}")
                     elif hasattr(r, 'order_id'):
@@ -511,7 +514,7 @@ class LiveTrader:
                         
                 if needs_sell_requote and state.sell_size > 0:
                     r = results[idx]
-                    if isinstance(r, Exception):
+                    if isinstance(r, BaseException):
                         if "POST_ONLY" not in str(r) and "RISK" not in str(r):
                             logger.error(f"[{symbol}] Real SELL failed: {r}")
                     elif hasattr(r, 'order_id'):
@@ -707,18 +710,8 @@ class LiveTrader:
 
     async def _update_dashboard(self):
         """Push internal state to the dashboard API."""
-        if not self.config.paper_mode:
-            try:
-                pubkey = self.client.user_pubkey_b58
-                user_info = await self.client.get_user(pubkey)
-                acc_id = user_info.get("accountIds", [0])[0]
-                acc_info = await self.client.get_account(acc_id)
-                for bal in acc_info.get("balances", []):
-                    if bal.get("tokenId") == 0:
-                        self.balance = float(bal.get("amount", 0))
-                        break
-            except Exception as e:
-                pass
+        # Use local self.balance instead of API pull to avoid double-counting Unrealized PnL
+        # since the exchange API's 'amount' represents total account equity.
         
         unrealized = 0.0
         positions_list = []
