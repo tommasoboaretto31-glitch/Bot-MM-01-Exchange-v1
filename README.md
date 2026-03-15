@@ -28,6 +28,15 @@
 
 ---
 
+> [!TIP]
+> **Support the Project!**
+> If you find this bot useful and want to support its continued development and improvement, please consider using our referral link when signing up for 01 Exchange:
+> **[Register on 01 Exchange (Ref: 019c2e4e)](https://01.xyz/ref/019c2e4e-3be0-74e8-ab72-22e2ffb15398)**
+>
+> Your support helps us maintain the bot and add new professional features!
+
+---
+
 ## ⚡ Quick Start
 
 ```bash
