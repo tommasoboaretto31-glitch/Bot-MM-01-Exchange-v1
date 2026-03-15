@@ -19,6 +19,9 @@ from src.data.binance import BinanceDataClient, o1_to_binance # type: ignore
 from src.risk.manager import DrawdownMonitor # type: ignore
 
 from src.dashboard.app import update_state, update_volume
+from src.strategy.signals import SignalPipeline, Signal
+from src.strategy.regime import RegimeDetector, RegimeState
+from src.heatmap.engine import BacktestHeatmap, LiquidityBias
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +49,11 @@ class MMSymbolState:
         self.last_atr: float = 0.0
         self.last_smart_score: float = 0.0
         self.last_requote_time: float = 0.0
+        
+        # Extended Strategy Data
+        self.last_signal: Optional[Signal] = None
+        self.last_regime: Optional[RegimeState] = None
+        self.heatmap_engine = BacktestHeatmap()
 
 class LiveTrader:
     """
@@ -78,6 +86,14 @@ class LiveTrader:
         self.balance = config.capital
         self.trades_today = 0
         self.halted = False
+        
+        # Strategy Pipeline
+        self.signal_pipeline = SignalPipeline(config.indicators)
+        self.regime_detectors: Dict[str, RegimeDetector] = {
+            s: RegimeDetector(
+                trend_threshold=config.indicators.adx_trend_threshold
+            ) for s in config.active_symbols
+        }
 
     async def start(self):
         """Initialize connections and start the trading loop."""
@@ -334,18 +350,34 @@ class LiveTrader:
                 pass
 
         cvd_div, rsi_div, oi_sig = 0, 0, 0
+        ind_cfg = self.config.indicators
         if not df_bin.empty:
-            bin_inds = compute_all(df_bin, atr_period=14, oi_series=oi_series)
+            bin_inds = compute_all(
+                df_bin, 
+                rsi_period=ind_cfg.rsi_period,
+                adx_period=ind_cfg.adx_period,
+                atr_period=ind_cfg.atr_period,
+                momentum_period=ind_cfg.momentum_period,
+                vwap_session_hours=ind_cfg.vwap_session_hours,
+                oi_series=oi_series
+            )
             bin_last = bin_inds.iloc[-1]
             cvd_div = bin_last.get("cvd_divergence", 0)
             rsi_div = bin_last.get("rsi_divergence", 0)
             oi_sig  = bin_last.get("oi_signal", 0)
         
         local_df = self.aggregators[symbol].to_df()
-        if len(local_df) < 14:
+        if len(local_df) < max(ind_cfg.rsi_period, ind_cfg.atr_period):
             return
             
-        local_inds = compute_all(local_df, atr_period=14)
+        local_inds = compute_all(
+            local_df, 
+            rsi_period=ind_cfg.rsi_period,
+            adx_period=ind_cfg.adx_period,
+            atr_period=ind_cfg.atr_period,
+            momentum_period=ind_cfg.momentum_period,
+            vwap_session_hours=ind_cfg.vwap_session_hours
+        )
         local_last = local_inds.iloc[-1]
         
         close = local_last["close"]
@@ -357,6 +389,28 @@ class LiveTrader:
         state = self.mm_states[symbol]
         state.last_atr = atr_val
         state.last_smart_score = cvd_div + rsi_div + oi_sig
+        
+        # ? NEW: Advanced Indicator Evaluation ?
+        # 1. Detect Regime
+        regime_detector = self.regime_detectors.get(symbol)
+        if regime_detector:
+            # We use Binance ADX/DI if available, otherwise local is possible but Binance is "truer"
+            adx_val = bin_last.get("adx", 20.0)
+            plus_di = bin_last.get("plus_di", 0.0)
+            minus_di = bin_last.get("minus_di", 0.0)
+            state.last_regime = regime_detector.detect(adx_val, plus_di, minus_di)
+            
+        # 2. Evaluate Heatmap Bias (Estimated from candles)
+        # Using a window of candles to estimate liquidity distribution
+        candle_window = local_df.iloc[-30:] # Last 30 candles
+        current_bias = state.heatmap_engine.compute_from_candles(candle_window, close)
+        
+        # 3. Evaluate Signal Pipeline (Filters + Bias)
+        state.last_signal = self.signal_pipeline.evaluate(
+            indicators=bin_last if not df_bin.empty else local_last,
+            bias=current_bias,
+            regime=state.last_regime or RegimeState("range", 20, 0, 0, "NONE", 0.5)
+        )
 
         # Volatility pause
         vol_pause_mult = getattr(self.config.market_maker, 'volatility_pause_mult', 3.0)
@@ -411,15 +465,33 @@ class LiveTrader:
         available = max(0, max_inv - inventory_value)
 
         target_order_usd = self.balance * (mm_cfg.order_size_pct / 100)
-        order_usd = min(
-            target_order_usd,
-            available if available > 0 else target_order_usd * 0.5
-        )
         
-        raw_order_size = order_usd / current_price if current_price > 0 else 0
-        order_size = int(raw_order_size * factor) / factor
+        # ? NEW: Signal-Based Filtering & Weighting ?
+        sig = state.last_signal
+        buy_weight = 1.0
+        sell_weight = 1.0
         
-        if order_size < min_size:
+        if sig:
+            if not sig.allow_long:
+                logger.debug(f"[{symbol}] Signal blocking LONGS: {sig.reasons}")
+                buy_weight = 0.0
+            else:
+                buy_weight = sig.long_weight
+                
+            if not sig.allow_short:
+                logger.debug(f"[{symbol}] Signal blocking SHORTS: {sig.reasons}")
+                sell_weight = 0.0
+            else:
+                sell_weight = sig.short_weight
+
+        # Compute sizes with weights
+        buy_order_usd = min(target_order_usd * buy_weight, available if available > 0 else target_order_usd * 0.5)
+        sell_order_usd = min(target_order_usd * sell_weight, available if available > 0 else target_order_usd * 0.5)
+        
+        buy_size = int((buy_order_usd / current_price) * factor) / factor if buy_order_usd > 0 else 0
+        sell_size = int((sell_order_usd / current_price) * factor) / factor if sell_order_usd > 0 else 0
+        
+        if buy_size < min_size and sell_size < min_size:
             state.buy_size = 0
             state.sell_size = 0
             return
@@ -463,18 +535,18 @@ class LiveTrader:
             ideal_sell = ideal_buy + min_tick
 
         # Check if we need to replace existing orders
-        needs_buy_requote = abs(ideal_buy - state.buy_price) > (min_tick * 2) or state.buy_size != order_size
-        needs_sell_requote = abs(ideal_sell - state.sell_price) > (min_tick * 2) or state.sell_size != order_size
+        needs_buy_requote = abs(ideal_buy - state.buy_price) > (min_tick * 2) or state.buy_size != buy_size
+        needs_sell_requote = abs(ideal_sell - state.sell_price) > (min_tick * 2) or state.sell_size != sell_size
         
         if not (needs_buy_requote or needs_sell_requote):
             return # Quotes are still competitive
             
         state.buy_price = ideal_buy
-        state.buy_size = order_size if needs_buy_requote else state.buy_size
+        state.buy_size = buy_size if needs_buy_requote else state.buy_size
         state.sell_price = ideal_sell
-        state.sell_size = order_size if needs_sell_requote else state.sell_size
+        state.sell_size = sell_size if needs_sell_requote else state.sell_size
 
-        logger.debug(f"[{symbol}] Re-Quoting B: {state.buy_price:.4f} A: {state.sell_price:.4f} S: {order_size:.4f}")
+        logger.debug(f"[{symbol}] Re-Quoting B: {state.buy_price:.4f} (S:{buy_size}) A: {state.sell_price:.4f} (S:{sell_size})")
 
         if not self.config.paper_mode:
             cancels = []
