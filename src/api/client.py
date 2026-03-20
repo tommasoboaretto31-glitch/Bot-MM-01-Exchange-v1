@@ -62,6 +62,7 @@ class O1Client:
         self._user_pubkey: bytes | None = None
         self._markets: dict[str, MarketInfo] = {}
         self._nonce_counter = 0
+        self._lock = asyncio.Lock()  # Prevent concurrent session creation
         self.stats = {
             "api_calls_total": 0,
             "api_calls_failed": 0,
@@ -175,7 +176,11 @@ class O1Client:
             return int(dt.timestamp())
             
         try:
-            return int(data) # type: ignore
+            val = int(data) # type: ignore
+            # Handle millisecond timestamps (e.g. 1,735,689,600,000)
+            if val > 50_000_000_000: 
+                return val // 1000
+            return val
         except (TypeError, ValueError):
             return 0
 
@@ -206,8 +211,7 @@ class O1Client:
         return self._session_id is not None
 
     def _user_sign(self, message: bytes) -> bytes:
-        hex_msg = binascii.hexlify(message)
-        return self._user_key.sign(hex_msg)
+        return self._user_key.sign(message)
 
     def _session_sign(self, message: bytes) -> bytes:
         if not self._session_key:
@@ -262,8 +266,6 @@ class O1Client:
         session_pubkey = self._session_key.public_key().public_bytes_raw()
         
         server_time = await self.get_timestamp()
-        if server_time > 2_000_000_000_000:
-            server_time = server_time // 1000
         expiry = server_time + 3600
         
         action = schema_pb2.Action()
@@ -280,13 +282,17 @@ class O1Client:
             )
         )
         
-        receipt = await self._execute_action(action, self._user_sign)
-        if receipt.HasField("err"):
-            raise RuntimeError(f"Session creation failed: {schema_pb2.Error.Name(receipt.err) if hasattr(schema_pb2.Error, 'Name') else receipt.err}")
-            
-        self._session_id = receipt.create_session_result.session_id
-        logger.info(f"01 Session created: {self._session_id}")
-        return str(self._session_id)
+        async with self._lock:
+            if self._session_id:
+                return str(self._session_id)
+                
+            receipt = await self._execute_action(action, self._user_sign)
+            if receipt.HasField("err"):
+                raise RuntimeError(f"Session creation failed: {schema_pb2.Error.Name(receipt.err) if hasattr(schema_pb2.Error, 'Name') else receipt.err}")
+                
+            self._session_id = receipt.create_session_result.session_id
+            logger.info(f"01 Session created: {self._session_id}")
+            return str(self._session_id)
 
     async def place_order(self, market_id: int, side: str, size: float,
                     price: float, order_type: str = "limit", reduce_only: bool = False) -> OrderResult:

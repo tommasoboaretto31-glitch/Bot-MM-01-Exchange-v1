@@ -202,8 +202,30 @@ class UltraStableLauncher(ctk.CTk):
         except Exception as e:
             self.show_status(f"Stop Error: {e}", "red")
 
+    def parse_private_key(self, raw_key: str):
+        cleaned = raw_key.strip().replace(" ", "").replace("\n", "").replace("\r", "")
+        if not cleaned: return None
+        
+        # Case A: JSON Array [1,2,3...]
+        if cleaned.startswith('[') and cleaned.endswith(']'):
+            try:
+                nums = json.loads(cleaned)
+                if isinstance(nums, list) and len(nums) >= 32:
+                    return [int(x) for x in nums[:64]]
+            except: pass
+            
+        # Case B: Base58
+        try:
+            import base58
+            decoded = list(base58.b58decode(cleaned))
+            if len(decoded) >= 32:
+                return decoded
+        except: pass
+        
+        return None
+
     def on_start(self):
-        private_key = self.key_entry.get().strip()
+        raw_key = self.key_entry.get().strip()
         capital = self.capital_entry.get().strip()
         
         try:
@@ -212,14 +234,11 @@ class UltraStableLauncher(ctk.CTk):
             app._is_paused = False
         except: pass
 
-
-
-
         # Validation for Private Key
         is_paper = self.paper_mode_var.get()
         id_json_exists = (PROJECT_ROOT / "id.json").exists()
         
-        if not is_paper and not private_key and not id_json_exists:
+        if not is_paper and not raw_key and not id_json_exists:
             messagebox.showerror("Error", "Private Key is REQUIRED for Real Trading!\nEither paste it above or ensure id.json exists.")
             return
 
@@ -240,17 +259,15 @@ class UltraStableLauncher(ctk.CTk):
             with open(cfg_file, "w", encoding="utf-8") as f:
                 tomlkit.dump(doc, f)
             
-            if private_key:
-                import base58
-                try:
-                    key_data = list(base58.b58decode(private_key))
-                    if len(key_data) < 32:
-                        raise ValueError("Key too short (must be at least 32 bytes decoded)")
-                    with open(PROJECT_ROOT / "id.json", "w") as f:
-                        json.dump(key_data, f)
-                except Exception as e:
-                    messagebox.showerror("Key Error", f"Invalid Private Key format: {e}\nMake sure you copied the BASE58 string from your wallet.")
+            if raw_key:
+                key_data = self.parse_private_key(raw_key)
+                if not key_data:
+                    messagebox.showerror("Key Error", "Invalid Private Key format!\n\nPro-Tip: Make sure you copied the BASE58 string or the [64 numbers] array from your wallet.")
                     return
+                
+                with open(PROJECT_ROOT / "id.json", "w") as f:
+                    json.dump(key_data, f)
+                self.write_log("Private key updated in id.json")
 
         except Exception as e:
             self.show_status(f"Config Error: {e}", "red")
@@ -258,27 +275,47 @@ class UltraStableLauncher(ctk.CTk):
 
         # Check Selected Coins
         selected_symbols = [sym for sym, cb in self.market_checkboxes.items() if cb.get()]
+        
+        # ONE-CLICK AUTO SETUP: If no coins selected, pick the top ones based on capital
         if not selected_symbols:
-            messagebox.showwarning("Warning", "Please select at least one coin to trade.")
-            return
+            max_coins = self.get_max_coins()
+            # Pick first N from available
+            selected_symbols = self.available_markets[:max_coins]
+            self.write_log(f"Auto-selected {len(selected_symbols)} markets for you.")
             
         max_allowed = self.get_max_coins()
         if len(selected_symbols) > max_allowed:
             messagebox.showerror("Limit Exceeded", f"With ${capital} capital, you can select a maximum of {max_allowed} coins. Please uncheck some coins.")
             return
 
-        # Update config with selected symbols
+        # Update both default.toml (common) AND active.toml (multi-coin)
         try:
+            # Update default.toml
             cfg_file = CONFIG_DIR / "default.toml"
-            with open(cfg_file, "r", encoding="utf-8") as f:
-                doc = tomlkit.load(f)
+            if cfg_file.exists():
+                with open(cfg_file, "r", encoding="utf-8") as f:
+                    doc = tomlkit.load(f)
+                doc["markets"]["symbols"] = selected_symbols
+                doc["general"]["capital"] = float(capital)
+                doc["general"]["paper_mode"] = self.paper_mode_var.get()
+                with open(cfg_file, "w", encoding="utf-8") as f:
+                    tomlkit.dump(doc, f)
             
-            doc["markets"]["symbols"] = selected_symbols
-            doc["general"]["capital"] = float(capital)
-            doc["general"]["paper_mode"] = self.paper_mode_var.get()
+            # Update active.toml for the new MultiRunner architecture
+            active_file = CONFIG_DIR / "active.toml"
+            active_doc = tomlkit.document()
+            active_table = tomlkit.table()
             
-            with open(cfg_file, "w", encoding="utf-8") as f:
-                tomlkit.dump(doc, f)
+            # Equal weight by default
+            weight = 1.0 / len(selected_symbols)
+            for sym in selected_symbols:
+                active_table.add(sym, round(weight, 4))
+            
+            active_doc.add("active", active_table)
+            with open(active_file, "w", encoding="utf-8") as f:
+                tomlkit.dump(active_doc, f)
+                
+            self.write_log(f"Capital allocated: {weight:.1%} per coin across {len(selected_symbols)} markets.")
         except Exception as e:
             self.show_status(f"Config Write Error: {e}", "red")
             return

@@ -1,0 +1,10 @@
+# ─────────────────────────────────────────────────────
+# XRPUSD — Tier A: Volume Farming
+# Spread 2.8 bps live | Depth $157k
+# ─────────────────────────────────────────────────────
+[market_maker]
+use_atr_spread   = false
+spread_bps       = 5.0
+fixed_tp_bps     = 2.0
+order_size_pct   = 30.0
+min_spread_bps   = 3.0

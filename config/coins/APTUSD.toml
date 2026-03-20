@@ -1,0 +1,10 @@
+# ─────────────────────────────────────────────────────
+# APTUSD — Tier B: Profit Farming
+# Spread 7.1 bps live | Depth $46k
+# ─────────────────────────────────────────────────────
+[market_maker]
+use_atr_spread   = false
+spread_bps       = 10.0
+fixed_tp_bps     = 3.0
+order_size_pct   = 20.0
+min_spread_bps   = 6.0

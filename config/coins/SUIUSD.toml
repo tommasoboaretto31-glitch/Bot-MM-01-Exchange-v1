@@ -1,0 +1,10 @@
+# ─────────────────────────────────────────────────────
+# SUIUSD — Tier B: Profit Farming
+# Spread 7.3 bps live | Depth $133k
+# ─────────────────────────────────────────────────────
+[market_maker]
+use_atr_spread   = false
+spread_bps       = 10.0
+fixed_tp_bps     = 3.0
+order_size_pct   = 20.0
+min_spread_bps   = 7.0

@@ -61,12 +61,16 @@ class LiveTrader:
     Connects to WebSocket, aggregates candles, and executes strategy.
     """
 
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, client: O1Client | None = None, allocation_weight: float = 1.0):
         self.config = config
+        self.allocation_weight = allocation_weight
         
-        # Load real keypair if we are NOT in paper mode
-        kp = None if config.paper_mode else 'id.json'
-        self.client = O1Client(config.api_url, keypair_path=kp)
+        # Use shared client if provided, otherwise create new one
+        if client:
+            self.client = client
+        else:
+            kp = None if config.paper_mode else config.keypair_path
+            self.client = O1Client(config.api_url, keypair_path=kp)
         
         # Market state: symbol -> aggregator
         self.aggregators: Dict[str, CandleAggregator] = {}
@@ -320,7 +324,8 @@ class LiveTrader:
     async def _on_candle_close(self, symbol: str):
         """Heavy duty: Recalculate indicators at candle close."""
         
-        await self._sync_account_balance()
+        if not self.config.paper_mode:
+            await self._sync_account_balance()
         
         # Drawdown Check
         dd_state = self.drawdown_monitor.update(self.balance)
@@ -337,100 +342,93 @@ class LiveTrader:
             return
         
         
-        # Fetch Binance Macro Data
+        # ── Binance: sole data source for ALL indicators ─────────────────────
         binance_sym = o1_to_binance(symbol)
-        oi_series = None
         df_bin = pd.DataFrame()
+        oi_series = None
         if binance_sym:
             try:
-                df_bin = await asyncio.to_thread(self.binance.fetch_klines_with_oi, binance_sym, "5m", 100)
+                df_bin = await asyncio.to_thread(
+                    self.binance.fetch_klines_with_oi, binance_sym, "5m", 100
+                )
                 if not df_bin.empty and "oi" in df_bin.columns:
                     oi_series = df_bin["oi"]
             except Exception as e:
-                pass
+                logger.debug(f"[{symbol}] Binance fetch failed: {e}")
 
-        cvd_div, rsi_div, oi_sig = 0, 0, 0
         ind_cfg = self.config.indicators
-        if not df_bin.empty:
-            bin_inds = compute_all(
-                df_bin, 
-                rsi_period=ind_cfg.rsi_period,
-                adx_period=ind_cfg.adx_period,
-                atr_period=ind_cfg.atr_period,
-                momentum_period=ind_cfg.momentum_period,
-                vwap_session_hours=ind_cfg.vwap_session_hours,
-                oi_series=oi_series
-            )
-            bin_last = bin_inds.iloc[-1]
-            cvd_div = bin_last.get("cvd_divergence", 0)
-            rsi_div = bin_last.get("rsi_divergence", 0)
-            oi_sig  = bin_last.get("oi_signal", 0)
-        
-        local_df = self.aggregators[symbol].to_df()
-        if len(local_df) < max(ind_cfg.rsi_period, ind_cfg.atr_period):
+
+        # Require valid Binance data — it is the single source of truth
+        if df_bin.empty or len(df_bin) < max(ind_cfg.rsi_period, ind_cfg.atr_period):
             return
-            
-        local_inds = compute_all(
-            local_df, 
+
+        bin_inds = compute_all(
+            df_bin,
             rsi_period=ind_cfg.rsi_period,
             adx_period=ind_cfg.adx_period,
             atr_period=ind_cfg.atr_period,
             momentum_period=ind_cfg.momentum_period,
-            vwap_session_hours=ind_cfg.vwap_session_hours
+            vwap_session_hours=ind_cfg.vwap_session_hours,
+            oi_series=oi_series,
         )
-        local_last = local_inds.iloc[-1]
-        
-        close = local_last["close"]
-        atr_val = local_last.get("atr", 0)
-        
+        bin_last = bin_inds.iloc[-1]
+
+        cvd_div = float(bin_last.get("cvd_divergence", 0) or 0)
+        rsi_div = float(bin_last.get("rsi_divergence", 0) or 0)
+        oi_sig  = float(bin_last.get("oi_signal", 0) or 0)
+
+        close   = float(bin_last["close"])
+        atr_val = float(bin_last.get("atr", 0) or 0)
+
         if atr_val <= 0 or np.isnan(atr_val) or close <= 0:
             return
 
         state = self.mm_states[symbol]
         state.last_atr = atr_val
         state.last_smart_score = cvd_div + rsi_div + oi_sig
-        
-        # ? NEW: Advanced Indicator Evaluation ?
-        # 1. Detect Regime
+
+        # 1. Regime Detection (ADX/DI from Binance)
         regime_detector = self.regime_detectors.get(symbol)
         if regime_detector:
-            # We use Binance ADX/DI if available, otherwise local is possible but Binance is "truer"
-            adx_val = bin_last.get("adx", 20.0)
-            plus_di = bin_last.get("plus_di", 0.0)
-            minus_di = bin_last.get("minus_di", 0.0)
+            adx_val  = float(bin_last.get("adx", 20.0) or 20.0)
+            plus_di  = float(bin_last.get("plus_di", 0.0) or 0.0)
+            minus_di = float(bin_last.get("minus_di", 0.0) or 0.0)
             state.last_regime = regime_detector.detect(adx_val, plus_di, minus_di)
-            
-        # 2. Evaluate Heatmap Bias (Estimated from candles)
-        # Using a window of candles to estimate liquidity distribution
-        candle_window = local_df.iloc[-30:] # Last 30 candles
+
+        # 2. Heatmap Bias — uses Binance OHLCV (richer volume data)
+        candle_window = df_bin.iloc[-30:]
         current_bias = state.heatmap_engine.compute_from_candles(candle_window, close)
-        
-        # 3. Evaluate Signal Pipeline (Filters + Bias)
+
+        # 3. Signal Pipeline (all filters operate on Binance indicators)
         state.last_signal = self.signal_pipeline.evaluate(
-            indicators=bin_last if not df_bin.empty else local_last,
+            indicators=bin_last,
             bias=current_bias,
-            regime=state.last_regime or RegimeState("range", 20, 0, 0, "NONE", 0.5)
+            regime=state.last_regime or RegimeState("range", 20, 0, 0, "NONE", 0.5),
         )
 
-        # Volatility pause
-        vol_pause_mult = getattr(self.config.market_maker, 'volatility_pause_mult', 3.0)
-        if vol_pause_mult > 0 and len(local_inds) >= 28:
-            avg_atr = local_inds['atr'].iloc[-28:-1].mean()
+        # Volatility Pause (ATR spike detection on Binance data)
+        vol_pause_mult = getattr(self.config.market_maker, "volatility_pause_mult", 3.0)
+        if vol_pause_mult > 0 and len(bin_inds) >= 28:
+            avg_atr = bin_inds["atr"].iloc[-28:-1].mean()
             if avg_atr > 0 and atr_val > avg_atr * vol_pause_mult:
-                logger.warning(f"[{symbol}] VOLATILITY PAUSE: ATR {atr_val:.6f} spiking. Skipping orders.")
+                logger.warning(
+                    f"[{symbol}] VOLATILITY PAUSE: ATR {atr_val:.6f} > {vol_pause_mult}x avg. Halting."
+                )
                 if abs(state.inventory) > 0:
                     await self._close_position_at_market(symbol, close)
                 return
 
-        # Check stale position
+        # Stale Position Killer
         mm_cfg = self.config.market_maker
         if abs(state.inventory) > 0:
             state.candles_in_position += 1
             if state.candles_in_position >= mm_cfg.stale_candles:
-                logger.info(f"[{symbol}] Closing STALE position of {state.inventory:.4f} at market {close:.4f}")
+                logger.info(
+                    f"[{symbol}] Closing STALE position of {state.inventory:.4f} @ {close:.4f}"
+                )
                 await self._close_position_at_market(symbol, close)
 
-        # Trigger order placement
+        # Trigger quote update using Binance reference close
         await self._update_market_maker_quotes(symbol, close)
 
     async def _update_market_maker_quotes(self, symbol: str, current_price: float):
@@ -485,6 +483,11 @@ class LiveTrader:
                 sell_weight = sig.short_weight
 
         # Compute sizes with weights
+        # Always use the most recent balance for dynamic sizing
+        # Scale total balance by this trader's allocation weight
+        current_balance = self.balance * self.allocation_weight
+        target_order_usd = current_balance * (mm_cfg.order_size_pct / 100)
+        
         buy_order_usd = min(target_order_usd * buy_weight, available if available > 0 else target_order_usd * 0.5)
         sell_order_usd = min(target_order_usd * sell_weight, available if available > 0 else target_order_usd * 0.5)
         

@@ -28,9 +28,21 @@ def vwap(df: pd.DataFrame, session_hours: int = 24) -> pd.Series:
     vol = df["volume"]
 
     # Create session grouper
-    session_td = pd.Timedelta(hours=session_hours)
-    first_ts = df.index[0]
-    session_id = ((df.index - first_ts) // session_td).astype(int)
+    session_td_ns = pd.Timedelta(hours=session_hours).value
+    
+    if isinstance(df.index, pd.DatetimeIndex):
+        ts_ns = df.index.values.astype(np.int64)
+        first_ns = df.index[0].value
+    else:
+        # Fallback for integer index (assume milliseconds if large)
+        ts_ns = df.index.values.astype(np.int64)
+        if len(ts_ns) > 0 and ts_ns[0] > 1e12: # Likely milliseconds or nanoseconds
+             # If it's already nanoseconds, good. If ms, convert to ns.
+             if ts_ns[0] < 1e15: ts_ns *= 1_000_000
+        first_ns = ts_ns[0] if len(ts_ns) > 0 else 0
+
+    session_id = (ts_ns - first_ns) // session_td_ns
+    session_id = session_id.astype(int)
 
     cum_tvol = (typical * vol).groupby(session_id).cumsum()
     cum_vol = vol.groupby(session_id).cumsum()
@@ -103,9 +115,9 @@ def adx(df: pd.DataFrame, period: int = 14) -> pd.DataFrame:
     )
 
     # Smoothed with EMA
-    atr = tr.ewm(span=period, adjust=False).mean()
-    plus_di = 100 * (plus_dm.ewm(span=period, adjust=False).mean() / atr)
-    minus_di = 100 * (minus_dm.ewm(span=period, adjust=False).mean() / atr)
+    atr_val = tr.ewm(span=period, adjust=False).mean()
+    plus_di = 100 * (plus_dm.ewm(span=period, adjust=False).mean() / atr_val)
+    minus_di = 100 * (minus_dm.ewm(span=period, adjust=False).mean() / atr_val)
 
     # ADX
     dx = (plus_di - minus_di).abs() / (plus_di + minus_di).replace(0, np.nan) * 100
@@ -161,7 +173,7 @@ def cvd(df: pd.DataFrame) -> pd.Series:
     if "delta" in df.columns:
         return df["delta"].cumsum().rename("cvd")
     
-    # Fallback: estimate delta from price direction ? volume
+    # Fallback: estimate delta from price direction * volume
     direction = np.sign(df["close"] - df["open"])
     estimated_delta = direction * df["volume"]
     return estimated_delta.cumsum().rename("cvd")
@@ -242,17 +254,17 @@ def oi_change_signal(oi_series: pd.Series, price: pd.Series, period: int = 5) ->
     
     # Strong signals (OI rising)
     result = result.where(
-        ~((oi_change > 0.01) & (price_change > 0)), 2   # OI? Price? = strong bull
+        ~((oi_change > 0.01) & (price_change > 0)), 2   # OI↑ Price↑ = strong bull
     )
     result = result.where(
-        ~((oi_change > 0.01) & (price_change < 0)), -2  # OI? Price? = strong bear
+        ~((oi_change > 0.01) & (price_change < 0)), -2  # OI↑ Price↓ = strong bear
     )
     # Weak signals (OI falling)
     result = result.where(
-        ~((oi_change < -0.01) & (price_change > 0)), 1  # OI? Price? = squeeze
+        ~((oi_change < -0.01) & (price_change > 0)), 1  # OI↓ Price↑ = squeeze
     )
     result = result.where(
-        ~((oi_change < -0.01) & (price_change < 0)), -1 # OI? Price? = liquidation
+        ~((oi_change < -0.01) & (price_change < 0)), -1 # OI↓ Price↓ = liquidation
     )
     
     return result.rename("oi_signal")

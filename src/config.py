@@ -242,3 +242,61 @@ def load_config(path: Path | None = None) -> Config:
     cfg.ws_url = os.getenv("O1_WS_URL", cfg.ws_url)
 
     return cfg
+
+
+def load_active_config() -> dict[str, float]:
+    """Load active coins and their weights from config/active.toml."""
+    path = CONFIG_DIR / "active.toml"
+    if not path.exists():
+        return {}
+    
+    try:
+        import tomllib
+        with open(path, "rb") as f:
+            data = tomllib.load(f)
+        return data.get("active", {})
+    except Exception as e:
+        logger.error("Failed to load active.toml: %s", e)
+        return {}
+
+
+def load_coin_config(symbol: str, base_cfg: Config | None = None) -> Config:
+    """Load specific config for a coin, overriding the base config."""
+    if base_cfg is None:
+        base_cfg = load_config()
+    
+    coin_path = CONFIG_DIR / "coins" / f"{symbol}.toml"
+    if not coin_path.exists():
+        # Just update the symbol and return
+        base_cfg.symbols = [symbol]
+        return base_cfg
+    
+    try:
+        import tomllib
+        with open(coin_path, "rb") as f:
+            overrides = tomllib.load(f)
+        
+        # Merge overrides into a copy of base_cfg
+        import copy
+        cfg = copy.deepcopy(base_cfg)
+        cfg.symbols = [symbol]
+        
+        import dataclasses as _dc
+        if "market_maker" in overrides:
+            merged = _dc.asdict(cfg.market_maker)
+            merged.update(overrides["market_maker"])
+            cfg.market_maker = _flat_to_dataclass(merged, MarketMakerConfig)
+        if "risk" in overrides:
+            merged = _dc.asdict(cfg.risk)
+            merged.update(overrides["risk"])
+            cfg.risk = _flat_to_dataclass(merged, RiskConfig)
+        if "indicators" in overrides:
+            merged = _dc.asdict(cfg.indicators)
+            merged.update(overrides["indicators"])
+            cfg.indicators = _flat_to_dataclass(merged, IndicatorConfig)
+            
+        return cfg
+    except Exception as e:
+        logger.error("Failed to load config for %s: %s", symbol, e)
+        base_cfg.symbols = [symbol]
+        return base_cfg

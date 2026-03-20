@@ -12,8 +12,14 @@
 <p align="center">
   <img src="https://img.shields.io/badge/python-3.11+-blue?style=flat-square&logo=python&logoColor=white" />
   <img src="https://img.shields.io/badge/exchange-01.xyz-00FF66?style=flat-square" />
-  <img src="https://img.shields.io/badge/strategy-Break--Even-cyan?style=flat-square" />
+  <img src="https://img.shields.io/badge/strategy-Dual--Tier-cyan?style=flat-square" />
   <img src="https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square" />
+</p>
+
+<p align="center">
+  <a href="https://discord.gg/PF4vpgcP"><strong>Discord</strong></a> •
+  <a href="https://t.me/holocrontechnologies"><strong>Telegram</strong></a> •
+  <a href="https://holocron-1.gitbook.io/holocron-3/"><strong>Gitbook</strong></a>
 </p>
 
 ---
@@ -113,40 +119,37 @@ python launcher.py
 
 ---
 
-## 🏗️ Architecture
+## 🏗️ Architecture & Workflow
 
-```
-┌─────────────────────────────────────────────────┐
-│                   ZeroOne Bot                   │
-│                                                 │
-│  ┌──────────┐  ┌──────────┐  ┌──────────────┐  │
-│  │Indicators│  │ Heatmap  │  │  Risk Engine  │  │
-│  │RSI · ADX │  │ CVD · OI │  │ Stop · Sizing │  │
-│  └────┬─────┘  └────┬─────┘  └──────┬───────┘  │
-│       └──────┬───────┘               │          │
-│         ┌────▼─────┐          ┌──────▼───────┐  │
-│         │  Smart   │          │   Position   │  │
-│         │  Score   │          │   Manager    │  │
-│         └────┬─────┘          └──────┬───────┘  │
-│              └──────────┬────────────┘          │
-│                   ┌─────▼──────┐                │
-│                   │  Grid MM   │                │
-│                   │  Engine    │                │
-│                   └─────┬──────┘                │
-└─────────────────────────┼───────────────────────┘
-                          │
-                    ┌─────▼──────┐
-                    │ 01 Exchange│
-                    │    API     │
-                    └────────────┘
+```mermaid
+graph LR
+    subgraph "1. DATA SOURCE"
+        B[Binance Futures]
+    end
+    
+    subgraph "2. BOT BRAIN"
+        L[Signal Logic]
+        R[Risk Engine]
+    end
+    
+    subgraph "3. EXECUTION"
+        X[01 Exchange]
+    end
+    
+    B -->|Live Indicators| L
+    L -->|Smart Score| R
+    R -->|Atomic Orders| X
+    X -->|Local Price| B
 ```
 
 ### How It Works
 
-1. **Indicators** (RSI, ADX, ATR, VWAP) generate a **Smart Score**
-2. The **Grid Engine** places buy/sell orders around the fair price
-3. Orders get filled → bot captures the spread → stays at **Break-Even**
-4. The **Risk Engine** enforces stop-losses and position limits
+1. **Binance-Only Data**: The bot uses **Binance Futures** as the single source of truth for indicators (RSI, ADX, ATR, VWAP) due to its superior liquidity and price discovery.
+2. **Real-Time Intelligence**: It fetches real-time **Open Interest** and **Volume Delta** to compute a "Smart Score," identifying the best moments to provide liquidity.
+3. **Dual-Tier Strategy**:
+   - **Tier A (Volume)**: Targeted high-frequency trading with tight spreads to maximize volume.
+   - **Tier B (Profit)**: Captures larger spreads on medium-liquidity coins for net profit.
+4. **Precision Execution**: Orders are placed on **01 Exchange** using "Atomic Requoting," ensuring your quotes are always competitive and pay the lowest possible fees (**Maker Fees**).
 
 ```
 |------- spread -------|------- spread -------|
@@ -232,12 +235,44 @@ zeroone/
 └── scripts/               # Utilities (PnL, build)
 ```
 
----
+## ⚙️ Multi-Coin Configuration (Pro Mode)
 
-## 💎 Features
+The bot now supports granular per-coin configurations to avoid session conflicts and allow different strategies per market.
+
+### 1. Active Markets (`config/active.toml`)
+Define which coins to trade and their relative capital allocation:
+```toml
+[active]
+SOLUSD = 0.5
+BTCUSD = 0.5
+```
+
+### 2. Per-Coin Overrides (`config/coins/`)
+Create a `.toml` file named after the symbol (e.g., `config/coins/SOLUSD.toml`) to override global settings:
+```toml
+[market_maker]
+spread_bps = 15.0
+inventory_skew_factor = 0.8
+
+[risk]
+max_position_pct = 10.0
+```
+
+### 3. Shared Session Logic
+The bot uses a single authenticated session across all coins via a shared `O1Client` with an `asyncio.Lock`. This eliminates `SIGNATURE_VERIFICATION` errors caused by session overwrites.
+
+## 📈 Dynamic Sizing
+Order sizes are now calculated dynamically based on:
+- **Real-time Balance**: Fetched from the exchange (non-paper mode).
+- **Signal Strength**: Weights from ADX/RSI signals are applied to reduce exposure in unfavorable market regimes.
+
+---
 
 | Feature | Description |
 | :--- | :--- |
+| **Binance Core** | Single source of truth (klines + OI) from Binance Futures |
+| **Real OI Signal** | Real-time Open Interest change detection for bias |
+| **Dual-Tier Strategy** | Optimized profiles for Volume Farming vs Profit Farming |
 | **Dynamic Sizing** | Auto-adjusts order size based on wallet balance |
 | **Inventory Skew** | Shifts quotes to flatten position bias |
 | **Grid Trading** | Multi-level orders for deeper liquidity |

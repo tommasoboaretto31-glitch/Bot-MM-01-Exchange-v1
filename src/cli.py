@@ -9,8 +9,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from src.config import load_config, LOG_DIR
+from src.config import load_config, LOG_DIR, load_active_config, load_coin_config
 from src.live.trader import LiveTrader
+from src.api.client import O1Client
 from src.dashboard.app import run_dashboard
 import src.dashboard.app as app
 import os
@@ -31,30 +32,40 @@ root_logger.addHandler(file_handler)
 logger = logging.getLogger("NuovoBot")
 
 async def run_bot_only():
-    """Runs the LiveTrader only."""
+    """Runs the LiveTrader(s)."""
     cfg = load_config()
-    trader = LiveTrader(cfg)
+    # Calculate weights
+    active_coins = load_active_config() or {s: 1.0 for s in cfg.active_symbols}
+    total_symbols = len(active_coins)
+    if total_symbols == 0:
+        return
+        
+    # Standardize weights
+    final_active = {}
+    for symbol in active_coins:
+        w = active_coins[symbol] if isinstance(active_coins, dict) else 1.0
+        if not isinstance(w, (int, float)) or w <= 0:
+            w = 1.0 / total_symbols
+        final_active[symbol] = w
+        
+    # Re-normalize
+    total_w = sum(final_active.values())
+    final_active = {s: w / total_w for s, w in final_active.items()}
+
+    client = O1Client(cfg.api_url, keypair_path=cfg.keypair_path)
+    trader_tasks = []
     
-    mode_str = "PAPER" if cfg.paper_mode else "REAL"
-    logger.info(f"Bot starting in {mode_str} Trading mode...")
+    for symbol, weight in final_active.items():
+        coin_cfg = load_coin_config(symbol, cfg)
+        trader = LiveTrader(coin_cfg, client=client, allocation_weight=weight)
+        trader_tasks.append(trader.start())
     
-    # Start the trader and await it
-    await trader.start()
+    await asyncio.gather(*trader_tasks)
 
 async def run_bot_with_dashboard():
     """Runs both bot and dashboard, dashboard first for responsiveness."""
     cfg = load_config()
-    trader = LiveTrader(cfg)
     
-    mode_str = "PAPER" if cfg.paper_mode else "REAL"
-    print(f"CLI_AUDIT: Bot starting. Capital=${cfg.capital}, Mode={mode_str}, Symbols={cfg.active_symbols}")
-    logger.info(f"Bot starting in {mode_str} Trading mode with Dashboard...")
-    
-    if not cfg.active_symbols:
-        logger.error("No active symbols configured! Please select at least one coin in the Launcher.")
-        print("ERROR: Cannot start bot without any selected coins.")
-        return
-
     # Ensure port is set for the dashboard
     if "DASHBOARD_PORT" not in os.environ:
         os.environ["DASHBOARD_PORT"] = "8000"
@@ -62,17 +73,42 @@ async def run_bot_with_dashboard():
     # Reset dashboard state so GUI shows correct initial capital
     app.reset_dashboard(cfg.capital)
     
-    # CRITICAL: Start Dashboard FIRST so the UI appears immediately
-    # while the bot engine loads market info / candles in the background.
+    # CRITICAL: Start Dashboard FIRST
     dashboard_task = asyncio.create_task(run_dashboard(cfg))
     
     # Wait a tiny bit to let uvicorn bind the port
     await asyncio.sleep(2)
+
+    # Calculate weights
+    active_coins = load_active_config() or {s: 1.0 for s in cfg.active_symbols}
+    total_symbols = len(active_coins)
+    if total_symbols == 0:
+        logger.error("No active symbols configured!")
+        return
+
+    # Standardize weights
+    final_active = {}
+    for symbol in active_coins:
+        w = active_coins[symbol] if isinstance(active_coins, dict) else 1.0
+        if not isinstance(w, (int, float)) or w <= 0:
+            w = 1.0 / total_symbols
+        final_active[symbol] = w
     
+    # Re-normalize
+    total_w = sum(final_active.values())
+    final_active = {s: w / total_w for s, w in final_active.items()}
+
+    client = O1Client(cfg.api_url, keypair_path=cfg.keypair_path)
+    trader_tasks = []
+    for symbol, weight in final_active.items():
+        coin_cfg = load_coin_config(symbol, cfg)
+        trader = LiveTrader(coin_cfg, client=client, allocation_weight=weight)
+        trader_tasks.append(trader.start())
+        
     try:
-        # Run both concurrently so they don't block each other
+        # Run all concurrently
         await asyncio.gather(
-            trader.start(),
+            *trader_tasks,
             dashboard_task
         )
     except Exception as e:
