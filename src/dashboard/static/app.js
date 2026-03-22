@@ -295,7 +295,14 @@ function drawEquityChart() {
 
 // ── Bot Control ───────────────────────────────────
 
-async function controlBot(command) {
+async function controlBot(command, btn) {
+    if (btn) {
+        btn.disabled = true;
+        const btnText = btn.querySelector('.btn-text');
+        const originalText = btnText.textContent;
+        btnText.textContent = '';
+        btn.insertAdjacentHTML('afterbegin', '<span class="spinner"></span>');
+    }
     try {
         const resp = await fetch('/api/control', {
             method: 'POST',
@@ -306,6 +313,14 @@ async function controlBot(command) {
         addLog(`Bot ${command}: ${data.status}`);
     } catch (e) {
         addLog(`Control error: ${e.message}`);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            const spinner = btn.querySelector('.spinner');
+            if (spinner) spinner.remove();
+            const btnText = btn.querySelector('.btn-text');
+            btnText.textContent = command.toUpperCase();
+        }
     }
 }
 
