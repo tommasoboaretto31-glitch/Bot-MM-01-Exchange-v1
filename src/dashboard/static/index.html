@@ -24,8 +24,12 @@
                 </div>
                 <div class="header-actions" style="margin-left: auto; display: flex; gap: 15px; align-items: center;">
                     <span id="clock" style="font-family: var(--mono); color: var(--accent);">--:--:--</span>
-                    <button class="btn btn-primary" id="btn-start" onclick="controlBot('start')" style="background: var(--accent); color: #000; border: none; padding: 5px 15px; border-radius: 5px; cursor: pointer; font-weight: bold;">START</button>
-                    <button class="btn btn-danger" id="btn-stop" onclick="controlBot('stop')" style="background: transparent; color: var(--red); border: 1px solid var(--red); padding: 5px 15px; border-radius: 5px; cursor: pointer;">STOP</button>
+                    <button aria-label="Start Engine" class="btn btn-primary" id="btn-start" onclick="controlBot('start', this)">
+                        <span class="btn-text">START</span>
+                    </button>
+                    <button aria-label="Stop Engine" class="btn btn-danger" id="btn-stop" onclick="controlBot('stop', this)">
+                        <span class="btn-text">STOP</span>
+                    </button>
                 </div>
             </header>
 
