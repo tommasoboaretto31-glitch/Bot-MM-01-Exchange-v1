@@ -114,8 +114,8 @@ def run_batch(symbols: list[str], timeframes: list[str], max_workers: int = 4):
         table = Table(title="Top 20 Configurations by Sharpe")
         for col in summary.columns[:10]:
             table.add_column(col, style="cyan" if col == "symbol" else "white")
-        for _, row in summary.head(20).iterrows():
-            table.add_row(*[f"{v:.3f}" if isinstance(v, float) else str(v) for v in row.values[:10]])
+        for row in summary.head(20).itertuples(index=False):
+            table.add_row(*[f"{v:.3f}" if isinstance(v, float) else str(v) for v in row[:10]])
         console.print(table)
 
         # Save to CSV

@@ -221,14 +221,14 @@ class LiveTrader:
                 return
             
             candles = []
-            for ts, row in df.iterrows():
+            for row in df.itertuples(index=True):
                 candles.append(Candle(
-                    timestamp=ts, # type: ignore
-                    open=float(row["open"]),
-                    high=float(row["high"]),
-                    low=float(row["low"]),
-                    close=float(row["close"]),
-                    volume=float(row["volume"])
+                    timestamp=row.Index, # type: ignore
+                    open=float(row.open),
+                    high=float(row.high),
+                    low=float(row.low),
+                    close=float(row.close),
+                    volume=float(row.volume)
                 ))
             
             self.aggregators[symbol].preload(candles)
