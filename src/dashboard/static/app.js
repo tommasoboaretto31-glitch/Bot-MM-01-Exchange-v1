@@ -48,48 +48,95 @@ function updateDashboard(data) {
     if (data.volumes) updateVolumes(data.volumes);
 }
 
+
+// ── DOM Helpers ───────────────────────────────────
+
+function setText(id, text) {
+    const el = document.getElementById(id);
+    if (!el) return;
+
+    // Micro-UX: Highlight value changes with a gentle pulse
+    if (el.textContent !== text && !el.dataset.animating) {
+        // Simple heuristic to determine if value increased or decreased (only for numbers/currency)
+        const oldVal = parseFloat(el.textContent.replace(/[^0-9.-]+/g, ''));
+        const newVal = parseFloat(String(text).replace(/[^0-9.-]+/g, ''));
+
+        if (!isNaN(oldVal) && !isNaN(newVal) && oldVal !== newVal) {
+            const color = newVal > oldVal ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)';
+            const origBg = el.style.backgroundColor;
+            const origTrans = el.style.transition;
+
+            el.dataset.animating = "true";
+            el.style.transition = 'none';
+            el.style.backgroundColor = color;
+            el.style.borderRadius = '4px';
+
+            // Force reflow
+            void el.offsetWidth;
+
+            el.style.transition = 'background-color 0.8s ease-out';
+            el.style.backgroundColor = 'transparent';
+
+            setTimeout(() => {
+                el.style.backgroundColor = origBg;
+                el.style.transition = origTrans;
+                delete el.dataset.animating;
+            }, 800);
+        }
+    }
+
+    el.textContent = text;
+}
+
+function setClass(id, className) {
+    const el = document.getElementById(id);
+    if (el) el.className = className;
+}
+
+function setWidth(id, width) {
+    const el = document.getElementById(id);
+    if (el) el.style.width = width;
+}
+
+function setHTML(id, html) {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = html;
+}
+
 function updateStatus(bot) {
-    const badge = document.getElementById('status-badge');
-    const text = document.getElementById('status-text');
+    setClass('status-badge', `status-badge ${bot.status}`);
+    setText('status-text', bot.status.toUpperCase());
 
-    badge.className = `status-badge ${bot.status}`;
-    text.textContent = bot.status.toUpperCase();
-
-    const mode = document.getElementById('stat-mode');
-    mode.textContent = bot.paper_mode ? 'PAPER' : 'LIVE';
-    mode.className = `stat-value ${bot.paper_mode ? 'neutral' : 'positive'}`;
+    setText('stat-mode', bot.paper_mode ? 'PAPER' : 'LIVE');
+    setClass('stat-mode', `stat-value ${bot.paper_mode ? 'neutral' : 'positive'}`);
 
     if (bot.start_time) {
         const elapsed = Math.floor(Date.now() / 1000 - bot.start_time);
         const h = Math.floor(elapsed / 3600);
         const m = Math.floor((elapsed % 3600) / 60);
         const s = elapsed % 60;
-        document.getElementById('stat-uptime').textContent = `Uptime: ${h}h ${m}m ${s}s`;
+        setText('stat-uptime', `Uptime: ${h}h ${m}m ${s}s`);
     }
 }
 
 function updateSignal(signal) {
-    const regimeTag = document.getElementById('regime-tag');
     const regime = (signal.regime || 'market_making').toUpperCase().replace('_', ' ');
-    regimeTag.textContent = regime;
-    regimeTag.className = `regime-tag ${signal.regime || 'market_making'}`;
+    setText('regime-tag', regime);
+    setClass('regime-tag', `regime-tag ${signal.regime || 'market_making'}`);
 
-    document.getElementById('bias-direction').textContent = signal.bias_direction || 'NEUTRAL';
-    document.getElementById('bias-score').textContent = (signal.bias_score || 0).toFixed(2);
+    setText('bias-direction', signal.bias_direction || 'NEUTRAL');
+    setText('bias-score', (signal.bias_score || 0).toFixed(2));
 
     const score = signal.bias_score || 0;
-    const longBar = document.getElementById('bias-long');
-    const shortBar = document.getElementById('bias-short');
-
     if (score > 0) {
-        longBar.style.width = `${Math.min(score * 50, 50)}%`;
-        shortBar.style.width = '0%';
+        setWidth('bias-long', `${Math.min(score * 50, 50)}%`);
+        setWidth('bias-short', '0%');
     } else if (score < 0) {
-        shortBar.style.width = `${Math.min(Math.abs(score) * 50, 50)}%`;
-        longBar.style.width = '0%';
+        setWidth('bias-short', `${Math.min(Math.abs(score) * 50, 50)}%`);
+        setWidth('bias-long', '0%');
     } else {
-        longBar.style.width = '0%';
-        shortBar.style.width = '0%';
+        setWidth('bias-long', '0%');
+        setWidth('bias-short', '0%');
     }
 }
 
@@ -99,29 +146,27 @@ function updatePerformance(perf) {
     const pnl = perf.pnl_today || 0;
     const ret = perf.total_return_pct || 0;
 
-    document.getElementById('stat-capital').textContent = `$${capital.toFixed(2)}`;
-    document.getElementById('stat-capital').className =
-        `stat-value ${capital >= initial ? 'positive' : 'negative'}`;
+    setText('stat-capital', `$${capital.toFixed(2)}`);
+    setClass('stat-capital', `stat-value ${capital >= initial ? 'positive' : 'negative'}`);
 
-    document.getElementById('stat-initial').textContent = `Initial: $${initial.toFixed(2)}`;
+    setText('stat-initial', `Initial: $${initial.toFixed(2)}`);
 
     const pnlSign = pnl >= 0 ? '+' : '-';
-    document.getElementById('stat-pnl').textContent = `${pnlSign}$${Math.abs(pnl).toFixed(2)}`;
-    document.getElementById('stat-pnl').className =
-        `stat-value ${pnl >= 0 ? 'positive' : 'negative'}`;
+    setText('stat-pnl', `${pnlSign}$${Math.abs(pnl).toFixed(2)}`);
+    setClass('stat-pnl', `stat-value ${pnl >= 0 ? 'positive' : 'negative'}`);
 
-    document.getElementById('stat-return').textContent = `Return: ${ret >= 0 ? '+' : ''}${ret.toFixed(2)}%`;
+    setText('stat-return', `Return: ${ret >= 0 ? '+' : ''}${ret.toFixed(2)}%`);
     
     const placed = perf.orders_placed || 0;
     const trades = perf.trades_today || 0;
     const fillRate = placed > 0 ? (trades / placed) * 100 : 0;
-    document.getElementById('stat-trades').textContent = trades;
-    document.getElementById('stat-fillrate').textContent = `${fillRate.toFixed(1)}%`;
+    setText('stat-trades', trades);
+    setText('stat-fillrate', `${fillRate.toFixed(1)}%`);
     
     const apiTotal = perf.api_calls_total || 0;
     const apiFailed = perf.api_calls_failed || 0;
     const errRate = apiTotal > 0 ? (apiFailed / apiTotal) * 100 : 0;
-    document.getElementById('stat-errrate').textContent = `${errRate.toFixed(1)}%`;
+    setText('stat-errrate', `${errRate.toFixed(1)}%`);
 
     // Update equity chart
     equityData.push(capital);
@@ -130,20 +175,18 @@ function updatePerformance(perf) {
 }
 
 function updatePositions(positions) {
-    const tbody = document.getElementById('positions-body');
-
     if (!positions || positions.length === 0) {
-        tbody.innerHTML = `
+        setHTML('positions-body', `
             <tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 24px;">
                 No open positions
-            </td></tr>`;
-        document.getElementById('stat-positions').textContent = '0';
+            </td></tr>`);
+        setText('stat-positions', '0');
         return;
     }
 
-    document.getElementById('stat-positions').textContent = positions.length;
+    setText('stat-positions', positions.length);
 
-    tbody.innerHTML = positions.map(p => {
+    const posHTML = positions.map(p => {
         const pnlClass = (p.pnl || 0) >= 0 ? 'positive' : 'negative';
         const sideClass = p.side === 'LONG' ? 'side-long' : 'side-short';
         return `
@@ -158,6 +201,7 @@ function updatePositions(positions) {
                 </td>
             </tr>`;
     }).join('');
+    setHTML('positions-body', posHTML);
 }
 
 // ── VOLUME TRACKING ───────────────────────────────
@@ -168,22 +212,21 @@ function updateVolumes(volumes) {
     const uptimeHours = volumes.uptime_hours || 0;
 
     // Hero section
-    document.getElementById('vol-total').textContent = formatUSD(totalVol);
+    setText('vol-total', formatUSD(totalVol));
 
     const progress = Math.min((totalVol / VOLUME_TARGET) * 100, 100);
-    document.getElementById('vol-progress').textContent = `${progress.toFixed(1)}%`;
-    document.getElementById('vol-bar').style.width = `${progress}%`;
+    setText('vol-progress', `${progress.toFixed(1)}%`);
+    setWidth('vol-bar', `${progress}%`);
 
     // Rate per hour
     const rate = uptimeHours > 0 ? totalVol / uptimeHours : 0;
-    document.getElementById('vol-rate').textContent = formatUSD(rate);
+    setText('vol-rate', formatUSD(rate));
 
     // Per-market breakdown
-    const container = document.getElementById('volume-markets');
     const marketEntries = Object.entries(markets);
 
     if (marketEntries.length === 0) {
-        container.innerHTML = '<div class="volume-market-empty">Waiting for trades...</div>';
+        setHTML('volume-markets', '<div class="volume-market-empty">Waiting for trades...</div>');
         return;
     }
 
@@ -191,7 +234,7 @@ function updateVolumes(volumes) {
     marketEntries.sort((a, b) => b[1].volume - a[1].volume);
     const maxVol = marketEntries[0][1].volume || 1;
 
-    container.innerHTML = marketEntries.map(([symbol, data]) => {
+    const volHTML = marketEntries.map(([symbol, data]) => {
         const vol = data.volume || 0;
         const trades = data.trades || 0;
         const pnl = data.pnl || 0;
@@ -213,6 +256,7 @@ function updateVolumes(volumes) {
                 </div>
             </div>`;
     }).join('');
+    setHTML('volume-markets', volHTML);
 }
 
 function formatUSD(val) {
@@ -328,6 +372,7 @@ async function controlBot(command, btn) {
 
 function addLog(msg) {
     const list = document.getElementById('log-list');
+    if (!list) return;
     const now = new Date().toTimeString().slice(0, 8);
     const entry = document.createElement('div');
     entry.className = 'log-entry';
@@ -368,7 +413,7 @@ async function pollFull() {
 // ── Clock ─────────────────────────────────────────
 
 function updateClock() {
-    document.getElementById('clock').textContent = new Date().toTimeString().slice(0, 8);
+    setText('clock', new Date().toTimeString().slice(0, 8));
 }
 
 // ── Init ──────────────────────────────────────────
