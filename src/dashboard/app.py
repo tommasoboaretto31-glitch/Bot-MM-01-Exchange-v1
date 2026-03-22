@@ -20,6 +20,9 @@ from typing import Any
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
+import urllib.parse
+
 import uvicorn
 
 # Add project root
@@ -32,6 +35,16 @@ from src.data.storage import list_cached
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="MM Bot 01 Exchange Dashboard", version="0.2.0")
+
+# Security: Add CORS middleware to prevent cross-origin requests from reading sensitive data
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://127.0.0.1:8000", "http://localhost:8000", "http://0.0.0.0:8000"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
+
 
 from src.config import DATA_DIR, ASSETS_DIR, STATIC_DIR
 DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -191,6 +204,16 @@ async def control(request: Request, action: dict):
 
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
+    # Security: Prevent Cross-Site WebSocket Hijacking (CSWSH)
+    origin = ws.headers.get("origin")
+    if origin:
+        parsed_origin = urllib.parse.urlparse(origin)
+        host = ws.headers.get("host")
+        if host and parsed_origin.netloc != host:
+            logger.warning(f"Rejected WebSocket connection from unexpected origin: {origin}")
+            await ws.close(code=1008)
+            return
+
     await ws.accept()
     _ws_clients.append(ws)
     try:
