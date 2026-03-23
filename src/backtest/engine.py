@@ -76,6 +76,39 @@ class Position:
             self.unrealized_pnl = (self.avg_entry - current_price) * self.size
         return self.unrealized_pnl
 
+    def add(self, side: str, size: float, price: float, stop: float) -> None:
+        """Add to or create a position."""
+        if size <= 0:
+            return
+
+        if not self.is_open:
+            self.side = side
+            self.size = size
+            self.avg_entry = price
+            self.stop_loss = stop
+        elif self.side == side:
+            # Add to existing -> weighted average entry
+            total_size = self.size + size
+            self.avg_entry = (
+                (self.avg_entry * self.size + price * size) / total_size
+            )
+            self.size = total_size
+            # Keep the tightest stop
+            if side == "LONG":
+                self.stop_loss = max(self.stop_loss, stop)
+            else:
+                self.stop_loss = min(self.stop_loss, stop)
+        else:
+            # Opposite side -> close or reduce
+            if size >= self.size:
+                # Fully close + reverse
+                self.side = side
+                self.size = size - self.size
+                self.avg_entry = price
+                self.stop_loss = stop
+            else:
+                self.size -= size
+
 
 # ? Backtest Engine ?
 
@@ -351,8 +384,8 @@ class BacktestEngine:
                             dd_monitor.record_trade(realized_pnl - fee)
 
                         # Update position
-                        self._add_to_position(
-                            position, target_side, level.size,
+                        position.add(
+                            target_side, level.size,
                             fill_price, level.stop_loss,
                         )
 
@@ -510,42 +543,6 @@ class BacktestEngine:
             position.side, position.avg_entry, close_price, pnl, reason,
         )
         return pnl
-
-    def _add_to_position(
-        self, position: Position, side: str, size: float,
-        price: float, stop: float,
-    ) -> None:
-        """Add to or create a position."""
-        if size <= 0:
-            return
-
-        if not position.is_open:
-            position.side = side
-            position.size = size
-            position.avg_entry = price
-            position.stop_loss = stop
-        elif position.side == side:
-            # Add to existing ? weighted average entry
-            total_size = position.size + size
-            position.avg_entry = (
-                (position.avg_entry * position.size + price * size) / total_size
-            )
-            position.size = total_size
-            # Keep the tightest stop
-            if side == "LONG":
-                position.stop_loss = max(position.stop_loss, stop)
-            else:
-                position.stop_loss = min(position.stop_loss, stop)
-        else:
-            # Opposite side ? close or reduce
-            if size >= position.size:
-                # Fully close + reverse
-                position.side = side
-                position.size = size - position.size
-                position.avg_entry = price
-                position.stop_loss = stop
-            else:
-                position.size -= size
 
     def _compute_metrics(
         self,
