@@ -236,8 +236,6 @@ class BacktestHeatmap:
         - High volume at prices above current ? liquidity above (bias long)  
         - High volume at prices below current ? liquidity below (bias short)
         """
-        import pandas as pd  # noqa: F811
-
         if df_window.empty or len(df_window) < 5:
             return LiquidityBias(
                 score=0.0, raw_score=0.0,
