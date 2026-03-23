@@ -266,7 +266,11 @@ class BacktestEngine:
             liq_above = float(np.sum(window_weighted[mask_above]))
             liq_below = float(np.sum(window_weighted[~mask_above]))
             
-            bias = heatmap.compute_direct(liq_above, liq_below, close, high, low)
+            spread_bps = 0.0
+            if close > 0:
+                spread_bps = (high - low) / close * 10000 * 0.1
+
+            bias = heatmap.compute_direct(liq_above, liq_below, spread_bps)
 
             # ? 4. Evaluate regime + signals ?
             regime = regime_det.detect(
