@@ -1,62 +1,66 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 320" width="900" height="320" style="background:#0d1117;border-radius:12px;">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 300" width="860" height="300">
   <defs>
-    <marker id="arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-      <polygon points="0 0, 10 3.5, 0 7" fill="#00FF66"/>
+    <marker id="arr" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#00FF66"/>
     </marker>
-    <filter id="glow">
-      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
-      <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
   </defs>
 
-  <!-- Box 1: Data Source -->
-  <rect x="30" y="60" width="220" height="200" rx="10" fill="#0d1117" stroke="#00E5FF" stroke-width="1.5"/>
-  <rect x="30" y="60" width="220" height="36" rx="10" fill="#00E5FF" fill-opacity="0.15"/>
-  <text x="140" y="84" text-anchor="middle" fill="#00E5FF" font-family="monospace" font-size="13" font-weight="bold" filter="url(#glow)">1. DATA SOURCE</text>
-  <text x="140" y="120" text-anchor="middle" fill="#ffffff" font-family="monospace" font-size="12">Binance Futures</text>
-  <text x="140" y="145" text-anchor="middle" fill="#8b949e" font-family="monospace" font-size="11">├ Klines (OHLCV)</text>
-  <text x="140" y="163" text-anchor="middle" fill="#8b949e" font-family="monospace" font-size="11">├ Open Interest</text>
-  <text x="140" y="181" text-anchor="middle" fill="#8b949e" font-family="monospace" font-size="11">├ Volume Delta</text>
-  <text x="140" y="199" text-anchor="middle" fill="#8b949e" font-family="monospace" font-size="11">└ Funding Rate</text>
-  <text x="140" y="232" text-anchor="middle" fill="#00E5FF" font-family="monospace" font-size="10" opacity="0.7">Superior liquidity &amp;</text>
-  <text x="140" y="248" text-anchor="middle" fill="#00E5FF" font-family="monospace" font-size="10" opacity="0.7">price discovery</text>
+  <!-- Background -->
+  <rect width="860" height="300" fill="#0d1117" rx="12"/>
+
+  <!-- ═══ BOX 1: DATA SOURCE (x=20, w=220, center=130) ═══ -->
+  <rect x="20" y="30" width="220" height="210" rx="8" fill="#0d1117" stroke="#00E5FF" stroke-width="1.5"/>
+  <rect x="20" y="30" width="220" height="34" rx="8" fill="#00E5FF" fill-opacity="0.15"/>
+  <text x="130" y="53" text-anchor="middle" dominant-baseline="middle" fill="#00E5FF" font-family="monospace" font-size="12" font-weight="bold">1. DATA SOURCE</text>
+  <text x="130" y="88"  text-anchor="middle" dominant-baseline="middle" fill="#ffffff"  font-family="monospace" font-size="12">Binance Futures</text>
+  <text x="130" y="112" text-anchor="middle" dominant-baseline="middle" fill="#8b949e" font-family="monospace" font-size="11">├ Klines (OHLCV)</text>
+  <text x="130" y="130" text-anchor="middle" dominant-baseline="middle" fill="#8b949e" font-family="monospace" font-size="11">├ Open Interest</text>
+  <text x="130" y="148" text-anchor="middle" dominant-baseline="middle" fill="#8b949e" font-family="monospace" font-size="11">├ Volume Delta</text>
+  <text x="130" y="166" text-anchor="middle" dominant-baseline="middle" fill="#8b949e" font-family="monospace" font-size="11">└ Funding Rate</text>
+  <text x="130" y="210" text-anchor="middle" dominant-baseline="middle" fill="#00E5FF" font-family="monospace" font-size="10" opacity="0.8">Superior liquidity &amp;</text>
+  <text x="130" y="226" text-anchor="middle" dominant-baseline="middle" fill="#00E5FF" font-family="monospace" font-size="10" opacity="0.8">price discovery</text>
 
   <!-- Arrow 1 -->
-  <line x1="252" y1="160" x2="318" y2="160" stroke="#00FF66" stroke-width="2" marker-end="url(#arrow)" filter="url(#glow)"/>
-  <text x="285" y="152" text-anchor="middle" fill="#00FF66" font-family="monospace" font-size="9">Live</text>
-  <text x="285" y="175" text-anchor="middle" fill="#00FF66" font-family="monospace" font-size="9">Indicators</text>
+  <line x1="242" y1="135" x2="298" y2="135" stroke="#00FF66" stroke-width="2" marker-end="url(#arr)"/>
+  <text x="270" y="122" text-anchor="middle" dominant-baseline="middle" fill="#00FF66" font-family="monospace" font-size="9">Live</text>
+  <text x="270" y="150" text-anchor="middle" dominant-baseline="middle" fill="#00FF66" font-family="monospace" font-size="9">Indicators</text>
 
-  <!-- Box 2: Bot Brain -->
-  <rect x="320" y="60" width="260" height="200" rx="10" fill="#0d1117" stroke="#00FF66" stroke-width="1.5"/>
-  <rect x="320" y="60" width="260" height="36" rx="10" fill="#00FF66" fill-opacity="0.12"/>
-  <text x="450" y="84" text-anchor="middle" fill="#00FF66" font-family="monospace" font-size="13" font-weight="bold" filter="url(#glow)">2. BOT BRAIN</text>
-  <text x="450" y="118" text-anchor="middle" fill="#ffffff" font-family="monospace" font-size="11">Signal Pipeline</text>
-  <text x="450" y="136" text-anchor="middle" fill="#8b949e" font-family="monospace" font-size="10">RSI · ADX · VWAP · OI</text>
-  <line x1="330" y1="148" x2="570" y2="148" stroke="#21262d" stroke-width="1"/>
-  <text x="450" y="166" text-anchor="middle" fill="#ffffff" font-family="monospace" font-size="11">Risk Engine</text>
-  <text x="450" y="184" text-anchor="middle" fill="#8b949e" font-family="monospace" font-size="10">Sizing · Stop · Drawdown</text>
-  <line x1="330" y1="196" x2="570" y2="196" stroke="#21262d" stroke-width="1"/>
-  <text x="450" y="214" text-anchor="middle" fill="#ffffff" font-family="monospace" font-size="11">Grid Generator</text>
-  <text x="450" y="232" text-anchor="middle" fill="#8b949e" font-family="monospace" font-size="10">ATR-based · Multi-level</text>
+  <!-- ═══ BOX 2: BOT BRAIN (x=300, w=260, center=430) ═══ -->
+  <rect x="300" y="30" width="260" height="210" rx="8" fill="#0d1117" stroke="#00FF66" stroke-width="1.5"/>
+  <rect x="300" y="30" width="260" height="34" rx="8" fill="#00FF66" fill-opacity="0.12"/>
+  <text x="430" y="47" text-anchor="middle" dominant-baseline="middle" fill="#00FF66" font-family="monospace" font-size="12" font-weight="bold">2. BOT BRAIN</text>
+
+  <text x="430" y="88"  text-anchor="middle" dominant-baseline="middle" fill="#ffffff" font-family="monospace" font-size="12" font-weight="bold">Signal Pipeline</text>
+  <text x="430" y="108" text-anchor="middle" dominant-baseline="middle" fill="#8b949e" font-family="monospace" font-size="11">RSI · ADX · VWAP · OI</text>
+
+  <line x1="315" y1="122" x2="545" y2="122" stroke="#21262d" stroke-width="1"/>
+
+  <text x="430" y="140" text-anchor="middle" dominant-baseline="middle" fill="#ffffff" font-family="monospace" font-size="12" font-weight="bold">Risk Engine</text>
+  <text x="430" y="160" text-anchor="middle" dominant-baseline="middle" fill="#8b949e" font-family="monospace" font-size="11">Sizing · Stop · Drawdown</text>
+
+  <line x1="315" y1="173" x2="545" y2="173" stroke="#21262d" stroke-width="1"/>
+
+  <text x="430" y="191" text-anchor="middle" dominant-baseline="middle" fill="#ffffff" font-family="monospace" font-size="12" font-weight="bold">Grid Generator</text>
+  <text x="430" y="211" text-anchor="middle" dominant-baseline="middle" fill="#8b949e" font-family="monospace" font-size="11">ATR-based · Multi-level</text>
 
   <!-- Arrow 2 -->
-  <line x1="582" y1="160" x2="648" y2="160" stroke="#00FF66" stroke-width="2" marker-end="url(#arrow)" filter="url(#glow)"/>
-  <text x="615" y="152" text-anchor="middle" fill="#00FF66" font-family="monospace" font-size="9">Atomic</text>
-  <text x="615" y="175" text-anchor="middle" fill="#00FF66" font-family="monospace" font-size="9">Orders</text>
+  <line x1="562" y1="135" x2="618" y2="135" stroke="#00FF66" stroke-width="2" marker-end="url(#arr)"/>
+  <text x="590" y="122" text-anchor="middle" dominant-baseline="middle" fill="#00FF66" font-family="monospace" font-size="9">Atomic</text>
+  <text x="590" y="150" text-anchor="middle" dominant-baseline="middle" fill="#00FF66" font-family="monospace" font-size="9">Orders</text>
 
-  <!-- Box 3: Execution -->
-  <rect x="650" y="60" width="220" height="200" rx="10" fill="#0d1117" stroke="#FF6B6B" stroke-width="1.5"/>
-  <rect x="650" y="60" width="220" height="36" rx="10" fill="#FF6B6B" fill-opacity="0.12"/>
-  <text x="760" y="84" text-anchor="middle" fill="#FF6B6B" font-family="monospace" font-size="13" font-weight="bold" filter="url(#glow)">3. EXECUTION</text>
-  <text x="760" y="118" text-anchor="middle" fill="#ffffff" font-family="monospace" font-size="12">01 Exchange</text>
-  <text x="760" y="143" text-anchor="middle" fill="#00FF66" font-family="monospace" font-size="11">BUY  $99,960 ←</text>
-  <text x="760" y="161" text-anchor="middle" fill="#00FF66" font-family="monospace" font-size="11">BUY  $99,980 ←</text>
-  <text x="760" y="179" text-anchor="middle" fill="#FFD700" font-family="monospace" font-size="11" font-weight="bold">── $100,000 ──</text>
-  <text x="760" y="197" text-anchor="middle" fill="#FF6B6B" font-family="monospace" font-size="11">SELL $100,020 →</text>
-  <text x="760" y="215" text-anchor="middle" fill="#FF6B6B" font-family="monospace" font-size="11">SELL $100,040 →</text>
-  <text x="760" y="242" text-anchor="middle" fill="#8b949e" font-family="monospace" font-size="10">Maker fees · Zero slippage</text>
+  <!-- ═══ BOX 3: EXECUTION (x=620, w=220, center=730) ═══ -->
+  <rect x="620" y="30" width="220" height="210" rx="8" fill="#0d1117" stroke="#FF6B6B" stroke-width="1.5"/>
+  <rect x="620" y="30" width="220" height="34" rx="8" fill="#FF6B6B" fill-opacity="0.12"/>
+  <text x="730" y="47" text-anchor="middle" dominant-baseline="middle" fill="#FF6B6B" font-family="monospace" font-size="12" font-weight="bold">3. EXECUTION</text>
+  <text x="730" y="88"  text-anchor="middle" dominant-baseline="middle" fill="#ffffff" font-family="monospace" font-size="12">01 Exchange</text>
+  <text x="730" y="112" text-anchor="middle" dominant-baseline="middle" fill="#00FF66" font-family="monospace" font-size="11">BUY  $99,960 ←</text>
+  <text x="730" y="130" text-anchor="middle" dominant-baseline="middle" fill="#00FF66" font-family="monospace" font-size="11">BUY  $99,980 ←</text>
+  <text x="730" y="148" text-anchor="middle" dominant-baseline="middle" fill="#FFD700" font-family="monospace" font-size="12" font-weight="bold">── $100,000 ──</text>
+  <text x="730" y="166" text-anchor="middle" dominant-baseline="middle" fill="#FF6B6B" font-family="monospace" font-size="11">SELL $100,020 →</text>
+  <text x="730" y="184" text-anchor="middle" dominant-baseline="middle" fill="#FF6B6B" font-family="monospace" font-size="11">SELL $100,040 →</text>
+  <text x="730" y="222" text-anchor="middle" dominant-baseline="middle" fill="#8b949e" font-family="monospace" font-size="10">Maker fees · Zero slippage</text>
 
-  <!-- Return arrow (bottom) -->
-  <path d="M 760 262 Q 760 290 450 290 Q 140 290 140 262" stroke="#8b949e" stroke-width="1.5" fill="none" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
-  <text x="450" y="308" text-anchor="middle" fill="#8b949e" font-family="monospace" font-size="10">Local price feed back to signal pipeline</text>
+  <!-- Return arrow bottom -->
+  <path d="M 730 242 Q 730 272 430 272 Q 130 272 130 242" stroke="#444" stroke-width="1.5" fill="none" stroke-dasharray="5,4" marker-end="url(#arr)"/>
+  <text x="430" y="288" text-anchor="middle" dominant-baseline="middle" fill="#555" font-family="monospace" font-size="10">Local price feed back to signal pipeline</text>
 </svg>
