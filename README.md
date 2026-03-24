@@ -121,25 +121,18 @@ python launcher.py
 
 ## 🏗️ Architecture & Workflow
 
-```mermaid
-graph LR
-    subgraph "1. DATA SOURCE"
-        B[Binance Futures]
-    end
-    
-    subgraph "2. BOT BRAIN"
-        L[Signal Logic]
-        R[Risk Engine]
-    end
-    
-    subgraph "3. EXECUTION"
-        X[01 Exchange]
-    end
-    
-    B -->|Live Indicators| L
-    L -->|Smart Score| R
-    R -->|Atomic Orders| X
-    X -->|Local Price| B
+```
+┌─────────────────┐     Live Indicators     ┌─────────────────┐
+│  Binance Futures │ ──────────────────────► │  Signal Logic   │
+│  (Data Source)   │                         │  + Risk Engine  │
+└─────────────────┘                         └────────┬────────┘
+        ▲                                            │
+        │  Local Price                  Atomic Orders│
+        │                                            ▼
+        │                              ┌─────────────────────┐
+        └──────────────────────────────│    01 Exchange       │
+                                       │    (Execution)       │
+                                       └─────────────────────┘
 ```
 
 ### How It Works
