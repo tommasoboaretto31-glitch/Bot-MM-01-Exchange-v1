@@ -634,7 +634,7 @@ class LiveTrader:
             
             if size > 0:
                 try:
-                    await self.client.place_order(self.market_ids[symbol], side, size, limit_price, "immediate", reduce_only=True)
+                    await self.client.place_order(self.market_ids[symbol], side, size, limit_price, "immediate", reduce_only=False)
                     logger.info(f"[{symbol}] Sent direct REAL IOC {side} to close stale position.")
                 except Exception as e:
                     logger.error(f"[{symbol}] Failed to send real IOC close: {e}", exc_info=True)
